@@ -20,6 +20,8 @@ def getWatershed(data, w):
             image[i][j] = int( data[i][j].getRisk(minimum, maximum) * (pow(2, numberOfBits) - 1))
 
     image = image.astype('uint8') * 255
+    cv2.imshow("w", resizeimage(image, 1000))
+    cv2.waitKey(0)
 
     # image = cv2.bitwise_not(image)
     # image = resizeimage(image, 1000)
@@ -35,7 +37,7 @@ def getWatershed(data, w):
 
     # Finding sure foreground area
     dist_transform = cv2.distanceTransform(thresh, cv2.DIST_L2, 5)
-    ret, sure_fg = cv2.threshold(dist_transform, 0.1 * dist_transform.max(), 255, 0)
+    ret, sure_fg = cv2.threshold(dist_transform, 0.3 * dist_transform.max(), 255, 0)
 
     # Finding unknown region
     sure_fg = np.uint8(sure_fg)
@@ -57,7 +59,6 @@ def getWatershed(data, w):
                 diff.append(a)
 
     image3[markers == -1] = [255, 0, 0]
-    print("YO")
 
     # Map to store region wise location objects
     regions = getRegions(markers, data)
@@ -76,7 +77,6 @@ def getWatershed(data, w):
 
     # Map to store the centers of the regions
     centers = {}
-    print("YO")
     maxSize = 0
     for k in regions:
         # Find maximum size region
@@ -98,7 +98,6 @@ def getWatershed(data, w):
 
         # Normalise the depth
         avgDepth[k] = depthSum/len(regions[k])
-    print("YO")
     # Normalize the size factors with respect to greatest size region
     for k in sizeFactor:
         sizeFactor[k] = sizeFactor[k] / maxSize
@@ -114,7 +113,6 @@ def getWatershed(data, w):
     riskFactor = {}
     for k in regions:
         riskFactor[k] = factor1*(1-avgDepth[k]) + factor2*sizeFactor[k]
-    print("YO")
     riskObjects = []
     rs = []
     for k in regions:
@@ -122,20 +120,21 @@ def getWatershed(data, w):
             continue
         risk = riskFactor[k]
         area = pow((pow(sizeList[k], 0.5) * w)/1000, 2)
-        rs.append((-risk, -area, k))
+        riskObjects.append(RiskMapRegion(centers[k],regionBoundary[k],risk,area))
+        # rs.append((-risk, -area, k))
 
-    rs.sort()
-    rss = rs[:w]
-    rb = {}
-    for r in rss:
-        rb[r[2]] = regionBoundary[r[2]]
+    # rs.sort()
+    # rss = rs[:w]
+    # rb = {}
+    # for r in rss:
+    #     rb[r[2]] = regionBoundary[r[2]]
     
-    print("YO")
-    sb = sort_boundaries(rb, data)
-    for r in rss:
-        riskObjects.append(RiskMapRegion(centers[r[2]],sb[r[2]],risk,area))
+    # print("YO")
+    # sb = sort_boundaries(rb, data)
+    # for r in rss:
+    #     riskObjects.append(RiskMapRegion(centers[r[2]],sb[r[2]],risk,area))
 
-    return riskObjects
+    return sorted(riskObjects, key=func)
 
 
 def getRegions(markers, locations):
@@ -166,7 +165,27 @@ def findboundary2(markers, location):
                             boundaries[v] = [(i, j)]
                         else:
                             boundaries[v].append((i, j))
-    return boundaries
+    locs = {}
+    for i, k in enumerate(boundaries):
+        print(i)
+        arr = boundaries[k]
+        done = [arr[0]]
+        arr.remove(arr[0])
+
+        while len(arr) > 0:
+            n = done[-1]
+            m = dist(n, arr[0])
+            j = 0
+            for i in range(len(arr)):
+                v = dist(n, arr[i])
+                if v < m:
+                    j = i
+                    m = v
+            done.append(arr[j])
+            arr.remove(arr[j])
+
+        locs[k] = [location[a[0]][a[1]] for a in done]
+    return locs
     
 
 def sort_boundaries(boundaries, location):

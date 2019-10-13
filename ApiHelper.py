@@ -2,6 +2,9 @@ import requests
 from Location import Location
 from LocationParser import LocationParser
 from ElevationParser import ElevationParser
+from DataStore import DataStore
+from watershed import getWatershed
+from RiskMap import RiskMap
 
 class APIHelper:
     _BASE_URL = "https://us1.locationiq.com/v1/reverse.php?key=a172c9cffa6540&lat={}&lon={}&format=json&zoom=10"
@@ -22,6 +25,14 @@ class APIHelper:
         locParser.parse()
 
         elevParser = ElevationParser(locParser.grid)
+
+        DataStore.save(elevParser.grid, name=name)
+
+        data = DataStore.load(name)
+        s = getWatershed(data, 100)
+
+        m = RiskMap(s, 10)
+        m.generate_kml(name=name)
     
     def get_progress(self, id):
         pass
